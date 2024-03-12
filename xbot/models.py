@@ -12,4 +12,8 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        return {"user": self.user, "content": self.content, "timestamp": self.timestamp}
+        return {
+            "user": self.user,
+            "content": self.content,
+            "timestamp": self.timestamp.isoformat(),
+        }
