@@ -5,3 +5,4 @@
 *.cert
 *.key
 instance/*
+__pycache__/*
