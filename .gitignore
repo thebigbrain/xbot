@@ -1,0 +1,7 @@
+.venv
+*.db
+*.pem
+*.crt
+*.cert
+*.key
+instance/*

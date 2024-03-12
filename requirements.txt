@@ -1,0 +1,12 @@
+flask
+flask_cors
+flask-sqlalchemy
+ollama
+requests
+websockets
+asyncio
+sqlalchemy
+waitress
+hypercorn[h2] 
+aiosqlite
+langchain-community
