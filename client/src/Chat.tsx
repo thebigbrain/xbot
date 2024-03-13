@@ -10,11 +10,15 @@ import {
   Box,
 } from "@mui/material";
 
+// Message接口
 interface Message {
-  user: string;
-  content: string;
+  sessionID: string;
+  sender: string;
+  text: string;
+  timestamp: Date;
 }
 
+// 设置axios默认值
 axios.defaults.baseURL = "http://localhost:5000";
 axios.defaults.withCredentials = false;
 axios.defaults.headers["content-type"] = "application/json";
@@ -23,68 +27,84 @@ const ChatApp = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
 
+  // 获取聊天历史
   const fetchChatHistory = async () => {
     try {
-      // 使用 axios 请求聊天历史
-      const response = await axios.get<Message[]>("/api/history");
-      setMessages(response.data);
+      const response = await axios.get<any>("/api/history", {
+        params: { session_id: 1 },
+      });
+      setMessages(response.data?.history || []);
     } catch (error) {
       console.error("Error fetching chat history:", error);
     }
   };
 
-  useEffect(() => {
-    fetchChatHistory();
-    // Optional: Setup a polling mechanism if needed
-  }, []);
-
-  function readChunk(r: ReadableStreamDefaultReader) {
-    r?.read().then(({ done, value }) => {
-      // If there is no more data to read
-      if (done) {
-        console.log("done", done);
-        return;
+  // 处理SSE数据并更新消息列表
+  const handleSSEData = (data: string) => {
+    // 根据SSE协议格式提取消息内容
+    if (data.startsWith("data:")) {
+      try {
+        // 提取“data: ”后面的内容
+        const jsonData = data.replace("data: ", "");
+        const parsedData: Message = JSON.parse(jsonData);
+        setMessages((prevMessages) => [...prevMessages, parsedData]);
+      } catch (error) {
+        console.error("Error parsing SSE data:", error);
       }
-      // Get the data and send it to the browser via the controller
-      // Check chunks by logging to the console
-      console.log(done, value);
+    }
+  };
 
-      readChunk(r);
-    });
-  }
-
+  // 处理发送消息
   const handleSend = async () => {
     try {
-      // 使用 axios 发送新消息
+      // 使用fetch发送请求
       const response = await fetch("http://localhost:5000/api/send", {
-        method: "POST", // *GET, POST, PUT, DELETE, etc.
-        mode: "no-cors", // no-cors, *cors, same-origin
-        cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
-        credentials: "same-origin", // include, *same-origin, omit
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}), // body data type must match "Content-Type" header
+        body: JSON.stringify({ text: newMessage }),
       });
 
-      console.log(response);
-      if (!response.body) return;
+      if (response.body) {
+        const reader = response.body.getReader();
 
-      const reader: ReadableStreamDefaultReader = response.body
-        .pipeThrough(new TextDecoderStream())
-        .getReader();
+        // 处理接收到的数据
+        const processStream = () => {
+          let buffer = "";
+          const decoder = new TextDecoder();
 
-      readChunk(reader);
+          reader.read().then(function processResult({ done, value }): any {
+            if (done) {
+              return;
+            }
 
-      // const newMessageFromResponse: Message = response.data;
-      // if (newMessageFromResponse) {
-      //   setMessages((msgs) => [...msgs, newMessageFromResponse]);
-      //   setNewMessage(""); // 清空输入框
-      // }
+            // 更新缓冲区
+            buffer += decoder.decode(value, { stream: true });
+            // 处理完整SSE消息
+            let dataIndex = buffer.indexOf("\n\n");
+            while (dataIndex !== -1) {
+              const message = buffer.slice(0, dataIndex + 1);
+              handleSSEData(message.trim());
+              buffer = buffer.slice(dataIndex + 2);
+              dataIndex = buffer.indexOf("\n\n");
+            }
+            return reader.read().then(processResult);
+          });
+        };
+        // 开始处理流
+        processStream();
+      }
+      setNewMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
+
+  // 在组件挂载时获取聊天历史
+  useEffect(() => {
+    fetchChatHistory();
+  }, []);
 
   return (
     <Container maxWidth="sm">
@@ -100,7 +120,7 @@ const ChatApp = () => {
         <List dense>
           {messages.map((message, index) => (
             <ListItem key={index}>
-              <ListItemText primary={`${message.user}: ${message.content}`} />
+              <ListItemText primary={`${message.sender}: ${message.text}`} />
             </ListItem>
           ))}
         </List>
