@@ -15,7 +15,9 @@ interface Message {
   content: string;
 }
 
-axios.defaults.baseURL = "https://localhost:5000";
+axios.defaults.baseURL = "http://localhost:5000";
+axios.defaults.withCredentials = false;
+axios.defaults.headers["content-type"] = "application/json";
 
 const ChatApp = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,19 +38,49 @@ const ChatApp = () => {
     // Optional: Setup a polling mechanism if needed
   }, []);
 
+  function readChunk(r: ReadableStreamDefaultReader) {
+    r?.read().then(({ done, value }) => {
+      // If there is no more data to read
+      if (done) {
+        console.log("done", done);
+        return;
+      }
+      // Get the data and send it to the browser via the controller
+      // Check chunks by logging to the console
+      console.log(done, value);
+
+      readChunk(r);
+    });
+  }
+
   const handleSend = async () => {
     try {
       // 使用 axios 发送新消息
-      const response = await axios.post("/api/send", {
-        user: "current_user",
-        content: newMessage,
+      const response = await fetch("http://localhost:5000/api/send", {
+        method: "POST", // *GET, POST, PUT, DELETE, etc.
+        mode: "no-cors", // no-cors, *cors, same-origin
+        cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+        credentials: "same-origin", // include, *same-origin, omit
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}), // body data type must match "Content-Type" header
       });
 
-      const newMessageFromResponse: Message = response.data;
-      if (newMessageFromResponse) {
-        setMessages((msgs) => [...msgs, newMessageFromResponse]);
-        setNewMessage(""); // 清空输入框
-      }
+      console.log(response);
+      if (!response.body) return;
+
+      const reader: ReadableStreamDefaultReader = response.body
+        .pipeThrough(new TextDecoderStream())
+        .getReader();
+
+      readChunk(reader);
+
+      // const newMessageFromResponse: Message = response.data;
+      // if (newMessageFromResponse) {
+      //   setMessages((msgs) => [...msgs, newMessageFromResponse]);
+      //   setNewMessage(""); // 清空输入框
+      // }
     } catch (error) {
       console.error("Error sending message:", error);
     }

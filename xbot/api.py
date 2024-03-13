@@ -2,6 +2,7 @@
 import json
 import time
 from flask import Blueprint, Response, request, jsonify, stream_with_context
+from flask_cors import CORS
 from xbot.message import get_new_messages
 from xbot.models import db, Message
 from langchain_community.llms import Ollama
@@ -10,8 +11,19 @@ api = Blueprint("api", __name__, url_prefix="/api")
 llm = Ollama(model="codellama")
 
 
-@api.route("/send", methods=["POST"])
+@api.route("/send", methods=["POST", "OPTIONS"])
 def send_message():
+    if request.method == "OPTIONS":
+        # 为 Preflight 请求创建一个空响应
+        headers = {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+        return Response(status=200, headers=headers)
+
     data = request.get_json()
     user = data["user"]
     content = data["content"]
@@ -25,21 +37,27 @@ def send_message():
 
     @stream_with_context
     def generate(last_checked: Message):
-        # 检索最新的消息，这里我们仅获取时间戳大于last_checked的消息
-        # 假设我们有一种机制来存储last_checked，例如通过客户端提供，
-        # 或者使用数据库中的某个值等
-        yield f"data: { json.dumps(last_checked.to_dict())}\n\n"
+        # yield f"data: { json.dumps(last_checked.to_dict())}\n\n"
+        # new_messages = get_new_messages(last_checked)
+        # for chunk in new_messages:
+        #     print(chunk)
+        #     yield f"data: {json.dumps(chunk)}\n\n"
+        yield "Hello "
+        yield "jjee"
+        yield "!"
 
-        # 用实际的方法获取新消息，代码将根据你的应用逻辑有所不同
-        new_messages = get_new_messages(last_checked)
-
-        for chunk in new_messages:
-            # 将消息对象转换为字典，准备作为JSON发送
-            print(chunk)
-            yield f"data: {json.dumps(chunk)}\n\n"
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
 
     # 使用Flask的stream_with_context来确保请求上下文随生成器一起工作
-    return Response(generate(new_message), minetype="text/event-stream")
+    return Response(
+        generate(new_message), content_type="text/event-stream", headers=headers
+    )
 
 
 @api.route("/history", methods=["GET"])
