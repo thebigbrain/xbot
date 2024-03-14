@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Container,
   List,
@@ -10,55 +9,49 @@ import {
   Box,
 } from "@mui/material";
 
-// Message接口
-interface Message {
+// 定义消息接口
+interface IMessage {
   sessionID: string;
   sender: string;
   text: string;
   timestamp: Date;
 }
 
-// 设置axios默认值
-axios.defaults.baseURL = "http://localhost:5000";
-axios.defaults.withCredentials = false;
-axios.defaults.headers["content-type"] = "application/json";
-
-const ChatApp = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+const ChatApp: React.FC = () => {
+  const [messages, setMessages] = useState<IMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
 
   // 获取聊天历史
-  const fetchChatHistory = async () => {
+  const fetchChatHistory = useCallback(async () => {
     try {
-      const response = await axios.get<any>("/api/history", {
-        params: { session_id: 1 },
-      });
-      setMessages(response.data?.history || []);
-    } catch (error) {
-      console.error("Error fetching chat history:", error);
-    }
-  };
-
-  // 处理SSE数据并更新消息列表
-  const handleSSEData = (data: string) => {
-    // 根据SSE协议格式提取消息内容
-    if (data.startsWith("data:")) {
-      try {
-        // 提取“data: ”后面的内容
-        const jsonData = data.replace("data: ", "");
-        const parsedData: Message = JSON.parse(jsonData);
-        setMessages((prevMessages) => [...prevMessages, parsedData]);
-      } catch (error) {
-        console.error("Error parsing SSE data:", error);
+      const response = await fetch(
+        `http://localhost:5000/api/history?session_id=1`
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setMessages(data.history || []);
+      } else {
+        throw new Error(data.message || "Error fetching data");
       }
+    } catch (error: any) {
+      console.error("Error fetching chat history:", error.message); // TypeScript 需要 error 为 any 类型，或者自定义 Error 类型
     }
-  };
+  }, []);
 
-  // 处理发送消息
-  const handleSend = async () => {
+  useEffect(() => {
+    fetchChatHistory();
+    // 依赖数组中包含 fetchChatHistory 则每当 fetchChatHistory 改变时都会重新执行
+  }, [fetchChatHistory]);
+
+  // 发送消息
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) {
+      return; // 如果消息为空，则不发送
+    }
     try {
-      // 使用fetch发送请求
-      const response = await fetch("http://localhost:5000/api/send", {
+      const response = await fetch(`http://localhost:5000/api/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -66,45 +59,68 @@ const ChatApp = () => {
         body: JSON.stringify({ text: newMessage }),
       });
 
-      if (response.body) {
-        const reader = response.body.getReader();
+      if (response.headers.get("Content-Type")?.includes("text/event-stream")) {
+        // 处理事件流
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
 
-        // 处理接收到的数据
-        const processStream = () => {
-          let buffer = "";
-          const decoder = new TextDecoder();
+        let combinedMessage = ""; // 用于累积合并后文本的字符串
 
-          reader.read().then(function processResult({ done, value }): any {
+        const processStream = async () => {
+          let completeMessage = "";
+          while (true && reader) {
+            const { done, value } = await reader.read();
             if (done) {
-              return;
+              break;
             }
+            const chunk = decoder.decode(value, { stream: true });
 
-            // 更新缓冲区
-            buffer += decoder.decode(value, { stream: true });
-            // 处理完整SSE消息
-            let dataIndex = buffer.indexOf("\n\n");
-            while (dataIndex !== -1) {
-              const message = buffer.slice(0, dataIndex + 1);
-              handleSSEData(message.trim());
-              buffer = buffer.slice(dataIndex + 2);
-              dataIndex = buffer.indexOf("\n\n");
+            completeMessage += chunk;
+
+            const events = completeMessage.split("\n\n");
+            completeMessage = events.pop() || ""; // 保存未完成部分的数据
+
+            for (const event of events) {
+              const dataMatch = event.match(/^data: (.*)$/m);
+              if (dataMatch) {
+                const data = dataMatch[1];
+                // 解析数据并且合并text字段
+                const newData = JSON.parse(data); // 假设数据是JSON格式且包含text字段
+                combinedMessage += newData.text; // 连接新的文本消息
+
+                // 更新消息显示，这里需要你实现一个更新界面的方法(setCombinedMessages)
+                setCombinedMessages(combinedMessage);
+              }
             }
-            return reader.read().then(processResult);
-          });
+          }
         };
-        // 开始处理流
-        processStream();
+
+        if (reader) {
+          processStream()
+            .then(() => {
+              console.log("Finished processing the stream.");
+            })
+            .catch((error) => {
+              console.error("Error while processing the stream:", error);
+            });
+        }
+      } else {
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Something went wrong");
+        }
       }
+
       setNewMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (error: any) {
+      console.error("Error sending message:", error.message);
     }
   };
 
-  // 在组件挂载时获取聊天历史
-  useEffect(() => {
-    fetchChatHistory();
-  }, []);
+  // ...[其余代码保持不变]...
+
+  // 假设我们有一个状态来存储合并后的文本消息
+  const [combinedMessages, setCombinedMessages] = useState("");
 
   return (
     <Container maxWidth="sm">
@@ -123,6 +139,9 @@ const ChatApp = () => {
               <ListItemText primary={`${message.sender}: ${message.text}`} />
             </ListItem>
           ))}
+          <ListItem>
+            <ListItemText primary={`AI: ${combinedMessages}`} />
+          </ListItem>
         </List>
         <Box
           component="form"
@@ -130,10 +149,7 @@ const ChatApp = () => {
             display: "flex",
             alignItems: "center",
           }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
+          onSubmit={handleSend}
         >
           <TextField
             fullWidth
@@ -143,7 +159,7 @@ const ChatApp = () => {
             variant="outlined"
             margin="normal"
           />
-          <Button variant="contained" color="primary" onClick={handleSend}>
+          <Button type="submit" variant="contained" color="primary">
             Send
           </Button>
         </Box>

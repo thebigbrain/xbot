@@ -119,6 +119,7 @@ func sendSse(c *gin.Context, msg Message) {
 	}
 
 	c.Writer.WriteString(fmt.Sprintf("data: %s\n\n", data))
+	// c.Writer.WriteString(fmt.Sprintf("%s", data))
 	c.Writer.Flush()
 }
 
