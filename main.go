@@ -110,6 +110,18 @@ func retrieveHistory() ([]Message, error) {
 	return history, nil
 }
 
+func getChatHistories() (r []schema.ChatMessage) {
+	messages, _ := retrieveHistory()
+	for _, msg := range messages {
+		if msg.Sender == "human" {
+			r = append(r, schema.HumanChatMessage{Content: msg.Text})
+		} else {
+			r = append(r, schema.AIChatMessage{Content: msg.Text})
+		}
+	}
+	return r
+}
+
 func sendSse(c *gin.Context, msg Message) {
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -190,17 +202,18 @@ func main() {
 		}
 		ctx := context.Background()
 
+		historyChats := getChatHistories()
+		historyChats = append(historyChats, schema.HumanChatMessage{Content: input.Text})
+
 		// 使用流处理功能调用LLM
-		_, err = llm.Call(ctx, []schema.ChatMessage{
-			schema.HumanChatMessage{Content: input.Text},
-		}, llms.WithStreamingFunc(func(_ context.Context, chunk []byte) error {
+		_, err = llm.Call(ctx, historyChats, llms.WithStreamingFunc(func(_ context.Context, chunk []byte) error {
 			chunkStr := string(chunk)
 			responseBuffer.WriteString(chunkStr)
 
 			// 创建并发送流消息
 			msg := Message{
 				SessionID: input.SessionID,
-				Sender:    "system",
+				Sender:    "bot",
 				Text:      chunkStr,
 				Timestamp: time.Now(),
 			}
@@ -216,7 +229,7 @@ func main() {
 		fullMessage := responseBuffer.String()
 		responseMessage := Message{
 			SessionID: input.SessionID,
-			Sender:    "system", // 指定系统作为消息发送者
+			Sender:    "bot", // 指定系统作为消息发送者
 			Text:      fullMessage,
 			Timestamp: time.Now(),
 		}

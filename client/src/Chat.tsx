@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import {
   Container,
   List,
@@ -7,6 +13,7 @@ import {
   Button,
   Box,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 import ReactMarkdown from "react-markdown";
 // import "github-markdown-css"; // 导入样式文件
@@ -25,6 +32,15 @@ interface IMessage {
 const ChatApp: React.FC = () => {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>();
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    });
+  };
 
   // 获取聊天历史
   const fetchChatHistory = useCallback(async () => {
@@ -41,12 +57,16 @@ const ChatApp: React.FC = () => {
     } catch (error: any) {
       console.error("Error fetching chat history:", error.message); // TypeScript 需要 error 为 any 类型，或者自定义 Error 类型
     }
+    scrollToBottom();
+  }, []);
+
+  useLayoutEffect(() => {
+    scrollToBottom();
   }, []);
 
   useEffect(() => {
     fetchChatHistory();
-    // 依赖数组中包含 fetchChatHistory 则每当 fetchChatHistory 改变时都会重新执行
-  }, [fetchChatHistory]);
+  }, []);
 
   // 发送消息
 
@@ -55,6 +75,21 @@ const ChatApp: React.FC = () => {
     if (!newMessage.trim()) {
       return; // 如果消息为空，则不发送
     }
+
+    setIsLoading(true);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        sessionID: "",
+        sender: "human",
+        text: newMessage,
+        timestamp: new Date(),
+      },
+    ]);
+    setNewMessage("");
+    scrollToBottom();
+
     try {
       const response = await fetch(`http://localhost:5000/api/send`, {
         method: "POST",
@@ -95,6 +130,7 @@ const ChatApp: React.FC = () => {
 
                 // 更新消息显示，这里需要你实现一个更新界面的方法(setCombinedMessages)
                 setCombinedMessages(combinedMessage);
+                scrollToBottom();
               }
             }
           }
@@ -107,6 +143,9 @@ const ChatApp: React.FC = () => {
             })
             .catch((error) => {
               console.error("Error while processing the stream:", error);
+            })
+            .finally(() => {
+              fetchChatHistory();
             });
         }
       } else {
@@ -115,20 +154,11 @@ const ChatApp: React.FC = () => {
           throw new Error(errorData.message || "Something went wrong");
         }
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          sessionID: "",
-          sender: "human",
-          text: newMessage,
-          timestamp: new Date(),
-        },
-      ]);
-      setNewMessage("");
     } catch (error: any) {
       console.error("Error sending message:", error.message);
     }
+
+    setIsLoading(false);
   };
 
   // 假设我们有一个状态来存储合并后的文本消息
@@ -159,8 +189,7 @@ const ChatApp: React.FC = () => {
       sx={{
         mb: 2,
         p: 2,
-        backgroundColor:
-          message.sender === "human" ? "lightblue" : "lightgreen",
+        backgroundColor: message.sender === "human" ? "#eee" : "aliceblue",
         borderRadius: "10px",
       }}
     >
@@ -205,19 +234,28 @@ const ChatApp: React.FC = () => {
                 <StyledListItem message={message} />
               </ListItem>
             ))}
-            {/* 假设combinedMessages也为Markdown文本 */}
-            {combinedMessages && (
-              <ListItem alignItems="flex-start" sx={{ display: "block" }}>
-                <StyledListItem
-                  message={{
-                    sessionID: "",
-                    text: combinedMessages,
-                    sender: "bot",
-                    timestamp: new Date(),
-                  }}
-                />
-              </ListItem>
+
+            {isLoading ? (
+              <CircularProgress />
+            ) : (
+              combinedMessages && (
+                <ListItem alignItems="flex-start" sx={{ display: "block" }}>
+                  <StyledListItem
+                    message={{
+                      sessionID: "",
+                      text: combinedMessages,
+                      sender: "bot",
+                      timestamp: new Date(),
+                    }}
+                  />
+                </ListItem>
+              )
             )}
+
+            <div
+              style={{ float: "left", clear: "both" }}
+              ref={(el) => (el ? (messagesEndRef.current = el) : null)}
+            ></div>
           </List>
         </Box>
         <Box
