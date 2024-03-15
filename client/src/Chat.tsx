@@ -3,11 +3,16 @@ import {
   Container,
   List,
   ListItem,
-  ListItemText,
   TextField,
   Button,
   Box,
+  Typography,
 } from "@mui/material";
+import ReactMarkdown from "react-markdown";
+// import "github-markdown-css"; // 导入样式文件
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+// 导入一个样式主题，例如：prism
+import { materialLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 // 定义消息接口
 interface IMessage {
@@ -111,43 +116,117 @@ const ChatApp: React.FC = () => {
         }
       }
 
+      setMessages((prev) => [
+        ...prev,
+        {
+          sessionID: "",
+          sender: "human",
+          text: newMessage,
+          timestamp: new Date(),
+        },
+      ]);
       setNewMessage("");
     } catch (error: any) {
       console.error("Error sending message:", error.message);
     }
   };
 
-  // ...[其余代码保持不变]...
-
   // 假设我们有一个状态来存储合并后的文本消息
   const [combinedMessages, setCombinedMessages] = useState("");
 
+  const renderers = {
+    // 此方法用于渲染 Markdown 中的代码块
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || "");
+      return !inline && match ? (
+        <SyntaxHighlighter
+          style={materialLight}
+          language={match[1]}
+          PreTag="div"
+          children={String(children).replace(/\n$/, "")}
+          {...props}
+        />
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    },
+  };
+
+  const StyledListItem = ({ message }: { message: IMessage }) => (
+    <Box
+      sx={{
+        mb: 2,
+        p: 2,
+        backgroundColor:
+          message.sender === "human" ? "lightblue" : "lightgreen",
+        borderRadius: "10px",
+      }}
+    >
+      <Typography variant="caption" display="block">
+        {message.sender === "human" ? "You" : "Bot"} -{" "}
+        {new Date(message.timestamp).toLocaleTimeString()}
+      </Typography>
+      <ReactMarkdown components={renderers} children={message.text} />
+    </Box>
+  );
+
   return (
-    <Container maxWidth="sm">
+    <Container maxWidth="md">
       <Box
         sx={{
-          my: 4,
           display: "flex",
           flexDirection: "column",
-          height: "80vh",
-          justifyContent: "space-between",
+          height: "calc(100vh - 16px)",
+          mt: 1,
+          mb: 1,
         }}
       >
-        <List dense>
-          {messages.map((message, index) => (
-            <ListItem key={index}>
-              <ListItemText primary={`${message.sender}: ${message.text}`} />
-            </ListItem>
-          ))}
-          <ListItem>
-            <ListItemText primary={`AI: ${combinedMessages}`} />
-          </ListItem>
-        </List>
+        <Box
+          sx={{
+            overflowY: "auto",
+            overflowX: "hidden",
+            flexGrow: 1,
+            "& .markdown-body": {
+              // 应用样式
+              padding: (theme) => theme.spacing(2),
+            },
+          }}
+        >
+          <List sx={{ paddingTop: 0, paddingBottom: 0 }}>
+            {/* 显示消息 */}
+            {messages.map((message, index) => (
+              <ListItem
+                key={index}
+                alignItems="flex-start"
+                sx={{ display: "block" }}
+              >
+                <StyledListItem message={message} />
+              </ListItem>
+            ))}
+            {/* 假设combinedMessages也为Markdown文本 */}
+            {combinedMessages && (
+              <ListItem alignItems="flex-start" sx={{ display: "block" }}>
+                <StyledListItem
+                  message={{
+                    sessionID: "",
+                    text: combinedMessages,
+                    sender: "bot",
+                    timestamp: new Date(),
+                  }}
+                />
+              </ListItem>
+            )}
+          </List>
+        </Box>
         <Box
           component="form"
           sx={{
             display: "flex",
             alignItems: "center",
+            pt: 1,
+            pb: 1,
           }}
           onSubmit={handleSend}
         >
@@ -157,9 +236,15 @@ const ChatApp: React.FC = () => {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             variant="outlined"
-            margin="normal"
+            size="small"
+            sx={{ mr: 1, flex: 1 }}
           />
-          <Button type="submit" variant="contained" color="primary">
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            sx={{ height: "40px", flexShrink: 0 }}
+          >
             Send
           </Button>
         </Box>

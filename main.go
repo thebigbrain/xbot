@@ -179,7 +179,7 @@ func main() {
 		input.Sender = "human"
 		saveMessage(input)
 
-		sendSse(c, input)
+		// sendSse(c, input)
 
 		// 初始化机器人回复的字符串缓冲区
 		var responseBuffer strings.Builder
