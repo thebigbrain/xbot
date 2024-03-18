@@ -39,10 +39,11 @@ func corsMiddleware() gin.HandlerFunc {
 
 // Message 定义了SSE中发送的消息的结构
 type Message struct {
-	SessionID string    `json:"sessionID"`
-	Sender    string    `json:"sender"`
-	Text      string    `json:"text"`
-	Timestamp time.Time `json:"timestamp"`
+	SessionID string                 `json:"sessionID"`
+	MessageID string                 `json:"id"`
+	Sender    schema.ChatMessageType `json:"sender"`
+	Text      string                 `json:"text"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 // 初始化数据库并创建所需的表
@@ -188,7 +189,7 @@ func main() {
 			input.SessionID = uuid.NewString()
 		}
 
-		input.Sender = "human"
+		input.Sender = schema.ChatMessageTypeHuman
 		saveMessage(input)
 
 		// sendSse(c, input)
@@ -213,7 +214,7 @@ func main() {
 			// 创建并发送流消息
 			msg := Message{
 				SessionID: input.SessionID,
-				Sender:    "bot",
+				Sender:    schema.ChatMessageTypeAI,
 				Text:      chunkStr,
 				Timestamp: time.Now(),
 			}
@@ -229,7 +230,7 @@ func main() {
 		fullMessage := responseBuffer.String()
 		responseMessage := Message{
 			SessionID: input.SessionID,
-			Sender:    "bot", // 指定系统作为消息发送者
+			Sender:    schema.ChatMessageTypeAI,
 			Text:      fullMessage,
 			Timestamp: time.Now(),
 		}

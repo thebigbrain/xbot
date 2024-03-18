@@ -1,6 +1,6 @@
 import React from "react";
-import Chat from "./Chat";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
+import Layout from "./Layout";
 
 const theme = createTheme();
 
@@ -8,7 +8,7 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Chat />
+      <Layout />
     </ThemeProvider>
   );
 };
