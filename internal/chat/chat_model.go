@@ -1,13 +1,14 @@
 package chat
 
 import (
-	"github.com/tyloafer/langchaingo/schema"
 	"time"
+
+	"github.com/tyloafer/langchaingo/schema"
 )
 
 // Message 定义了 API 消息的结构。
 type Message struct {
-	ID        string                 `json:id`
+	Id        string                 `json:id`
 	SessionID string                 `json:"sessionId"`
 	Sender    schema.ChatMessageType `json:"sender"`
 	Text      string                 `json:"text"`

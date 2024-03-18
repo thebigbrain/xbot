@@ -71,7 +71,7 @@ func sendHandler(service *ChatService) gin.HandlerFunc {
 		ctx := c.Request.Context()
 		// 保存消息
 		savedMessage, err := service.SaveMessage(ctx, Message{
-			ID:        uuid.NewString(),
+			Id:        uuid.NewString(),
 			SessionID: input.SessionID,
 			Sender:    input.Sender,
 			Text:      input.Text,
@@ -87,7 +87,7 @@ func sendHandler(service *ChatService) gin.HandlerFunc {
 		// 调用LLM处理用户的输入并获取回复
 		responseMessage, err := service.ProcessMessageWithLLM(ctx, *savedMessage, func(chunkStr string) {
 			sse.SendSse(c, Message{
-				ID:        uuid.NewString(),
+				Id:        uuid.NewString(),
 				SessionID: input.SessionID,
 				Sender:    schema.ChatMessageTypeAI,
 				Text:      chunkStr,
