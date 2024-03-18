@@ -140,6 +140,7 @@ const ChatApp: React.FC = () => {
           processStream()
             .then(() => {
               console.log("Finished processing the stream.");
+              setCombinedMessages("");
             })
             .catch((error) => {
               console.error("Error while processing the stream:", error);
