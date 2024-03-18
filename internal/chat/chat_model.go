@@ -8,7 +8,7 @@ import (
 
 // Message 定义了 API 消息的结构。
 type Message struct {
-	Id        string                 `json:id`
+	ID        string                 `json:"id"`
 	SessionID string                 `json:"sessionId"`
 	Sender    schema.ChatMessageType `json:"sender"`
 	Text      string                 `json:"text"`
