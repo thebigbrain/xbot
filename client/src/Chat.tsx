@@ -36,6 +36,8 @@ const ChatApp: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>();
 
+  const currentSessionId = "1";
+
   const scrollToBottom = () => {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
@@ -46,7 +48,7 @@ const ChatApp: React.FC = () => {
   const fetchChatHistory = useCallback(async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/history?session_id=1`
+        `http://localhost:5000/api/history?sessionId=${currentSessionId}`
       );
       const data = await response.json();
       if (response.ok) {
@@ -81,7 +83,7 @@ const ChatApp: React.FC = () => {
     setMessages((prev) => [
       ...prev,
       {
-        sessionID: "",
+        sessionID: currentSessionId,
         sender: "human",
         text: newMessage,
         timestamp: new Date(),
@@ -130,7 +132,7 @@ const ChatApp: React.FC = () => {
 
                 // 更新消息显示，这里需要你实现一个更新界面的方法(setCombinedMessages)
                 setCombinedMessages(combinedMessage);
-                scrollToBottom();
+                // scrollToBottom();
               }
             }
           }

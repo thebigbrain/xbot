@@ -90,7 +90,7 @@ func sendHandler(c *gin.Context) {
 			Text:      chunkStr,
 			Timestamp: time.Now(),
 		}
-		sendSse(c, msg)
+		SendSse(c, msg)
 		return nil
 	}))
 	if err != nil {
